@@ -1,20 +1,42 @@
 const format = require('string-format')
+const xhr = require('xhr-request');
+const parseString = require('xml2js').parseString;
+const config = require("./config.json");
+const nls = require("./nls.json")["es"];
+
 const Discord = require("discord.js");
 const client = new Discord.Client();
-const xhr = require('xhr-request');
 
 client.on("ready", () => {
-	console.log("I am ready!");
+  // This event will run if the bot starts, and logs in, successfully.
+  console.log(`Bot has started, with ${client.users.size} users, in ${client.channels.size} channels of ${client.guilds.size} guilds.`);
+  // Example of changing the bot's playing game to something useful. `client.user` is what the
+  // docs refer to as the "ClientUser".
+	client.user.setActivity(` WoW on ${realmName}, !help`);
 });
-
-const availableCommands = ["item","i","quest","q","npc","n"];
-const commandPrefix = "!";
-const reCommand = new RegExp(commandPrefix + "(" + availableCommands.join("|") + ")\\s*(.*)");
-const searchBackend = "https://classicdb.ch/opensearch.php?search={}";
-const resultBackend = "https://classicdb.ch/?{}={}";
-const imageBackend = "http://classicdb.ch/images/icons/{}/{}.jpg";
-const ajaxBackend = "https://classicdb.ch/ajax.php?item={}&power";
+client.on("guildMemberAvailable", (member) => {
+	console.log(member);
+});
+const availableCommands = ["item","i","quest","q","npc","n","player","p","help","h"];
+const reCommand = new RegExp(config.prefix + "(" + availableCommands.join("|") + ")\\s*(.*)");
+const searchBackend = "https://classicdb.ch/opensearch.php?search={}";	// query
+const resultBackend = "https://classicdb.ch/?{}={}";										// category, id
+const ajaxBackend = "https://classicdb.ch/ajax.php?{}={}&power";				// category, id
+const imageBackend = "http://classicdb.ch/images/icons/{}/{}.jpg";			// size, id(name)
+const armoryLink = "http://armory.twinstar.cz/character-sheet.xml?r={}&cn={}";
+const armoryFaceImage = "http://armory.twinstar.cz/images/portraits/wow/{}-{}-{}.gif"; // sex, race, classid
 const discordLink = "{}";
+const realmName = "Kronos III";
+/*
+if ((type == 3 || type == 6 || type == 9 || type == 10) && param1) {
+	div.className += " live-search-icon";
+	div.style.backgroundImage = "url(images/icons/small/" + param1.toLowerCase() + ".jpg)"
+} else {
+	if (type == 5 && param1 >= 1 && param1 <= 2) {
+		div.className += " live-search-icon-quest-" + (param1 == 1 ? "alliance": "horde")
+	}
+}
+*/
 const commandToCategory = {
 	"n": 1,
 	"o": 2,
@@ -22,25 +44,33 @@ const commandToCategory = {
 	"q": 5
 };
 const categoryToCommand = {
-	1: "npc",
-	2: "object",
-	3: "item",
-	5: "quest"
-}
+	1:"npc",
+	2:"object",
+	3:"item",
+	4:"itemset",
+	5:"quest",
+	6:"spell",
+	7:"zone",
+	8:"faction",
+	9:"pet",
+	10:"achievement",
+	20:"article",
+	21:"user",
+	22:"patchnotes",
+	30:"characters"
+};
+const categoryToIcon = {
+	1: "spell_shadow_charm",
+	5: "inv_scroll_11"
+};
 const rarityToColor = {
 	1: 1,
 	2: 65280,
 	3: 10751,
 	4: 12452095,
 	5: 16748032
-}
+};
 const elseColor = 15269632;
-const categoryToIcon = {
-	1: "spell_shadow_charm",
-	2: "whatever",
-	4: "masswatherver",
-	5: "inv_scroll_11"
-}
 // inv_misc_questionmark
 function resultToLink(r) {
 	return format(discordLink, format(resultBackend, categoryToCommand[r[1]], r[2]));
@@ -49,62 +79,95 @@ function linkWithName(r) {
 	return format("**{}** {}", r[0], resultToLink(r));
 }
 client.on("message", (message) => {
-	if (message.content.startsWith(commandPrefix) && !message.author.bot) {
+	if (message.content.startsWith(config.prefix) && !message.author.bot) {
 		let command = reCommand.exec(message.content.toLowerCase());
 		if (command) {
-			category = commandToCategory[command[1][0]];
-			input = command[2];
-			xhr(format(searchBackend, input), { json: true }, function(err, data) {
-				// 0: input
-				// 1: names
-				// 7: ids =>
-					// 0: category
-					// 1: id
-					// 2: icon
-					// 3: rarity
-				if (data && data[1] && data[1].length > 0 && data[7] && data[7].length) {
-					let d = data[1].map((x, i) => [x].concat(data[7][i]));
-					let matches = d.filter(x => x[1] == category);
-					switch(matches.length) {
-						case 0:
-							message.reply(format("no results found for **{}**", input));
-							// TODO: avisar de que hay resultados de otro tipo
-						break;
-						case 1:
-							/*message.reply(resultToLink(matches[0]));
-							console.log(format(ajaxBackend, matches[0][2]));
-							xhr(format(ajaxBackend, matches[0][2]), function(err, data) {
-								console.log(err, data);
+			let cmd = command[1][0];
+			let category = commandToCategory[cmd];
+			let input = command[2];
+			if (cmd === "h") {
+				message.reply(nls.message.help);
+				message.delete();
+			} else {
+				if (input.length > 0) {
+					switch(cmd) {
+						case "p":	// armory search
+							let armoryUrl = encodeURI(format(armoryLink, realmName, input));
+							xhr(armoryUrl, function(err, data) {
+								parseString(data, function (err, result) {
+									if (!result.page.errorhtml) {
+										let character = result.page.characterInfo[0].character[0]["$"];
+										message.reply({
+											"embed": {
+												"thumbnail": {
+													"url": format(armoryFaceImage, character.genderId, character.raceId, character.classId)
+												},
+												"url": armoryUrl,
+												"title": format("{}{}{}", character.prefix ? format("{} ", character.prefix) : "", character.name, character.guildName ? format(" <{}>", character.guildName) : ""),
+												"description": format("Level {} {} {}", character.level, character.race, character.class),
+												"color": character.factionId == "1" ? 16711680 : 255
+											}
+										});
+										message.delete();
+									} else {
+										message.reply(format(nls.message.noResults, "player", input));
+										message.delete();
+									}
+								});
 							});
-							*/
-							message.reply({
-								"embed": {
-									"thumbnail": {
-									  "url": format(imageBackend, "medium", categoryToIcon[matches[0][1]] || matches[0][3].toLowerCase())
-									},
-									/*
-									"image": {
-									  "url": "https://cdn.discordapp.com/embed/avatars/0.png"
-									},
-									*/
-									"url": resultToLink(matches[0]),
-									"title": matches[0][0],
-									"description": resultToLink(matches[0]),
-									"color": rarityToColor[matches[0][4]] || elseColor
-								}
-							})
 						break;
-						default:
-							matches = matches.map(linkWithName);
-							message.reply(format("multiple results for **{}**:\n{}", input, matches.join("\n")));
+						default: // classicdb search
+							xhr(encodeURI(format(searchBackend, input)), { json: true }, function(err, data) {
+								// 0: input
+								// 1: names
+								// 7: ids =>
+									// 0: category
+									// 1: id
+									// 2: icon
+									// 3: rarity
+								if (data && data[1] && data[1].length > 0 && data[7] && data[7].length) {
+									let d = data[1].map((x, i) => [x].concat(data[7][i]));
+									let matches = d.filter(x => x[1] == category);
+									switch(matches.length) {
+										case 0:
+											message.reply(format(nls.message.noResults, categoryToCommand[category], input));
+											message.delete();
+											// TODO: avisar de que hay resultados de otro tipo?
+										break;
+										case 1:
+											message.reply({
+												"embed": {
+													"thumbnail": {
+														"url": format(imageBackend, "medium", categoryToIcon[matches[0][1]] || matches[0][3].toLowerCase())
+													},
+													"url": resultToLink(matches[0]),
+													"title": matches[0][0],
+													"description": resultToLink(matches[0]),
+													"color": rarityToColor[matches[0][4]] || elseColor
+												}
+											});
+											message.delete();
+										break;
+										default:
+											matches = matches.map(linkWithName);
+											message.reply(format(nls.message.multipleResults, categoryToCommand[category], input, matches.join("\n")));
+											message.delete();
+										break;
+									}
+								} else {
+									message.reply(format(nls.message.noResults, categoryToCommand[category], input));
+									message.delete();
+								}
+							});
 						break;
 					}
 				} else {
-					message.reply(format("no results found for **{}**", input));
+					message.reply(format(nls.message.emptyQuery, command[1]));
+					message.delete();
 				}
-			});
+			}
 		}
 	}
 });
 
-client.login("NDQwNDE2NDI0NzA0MzQ0MDY1.Dchohw.VR8N-PzH4PBrFJfwQdxSDntNXUM");
+client.login(config.token);

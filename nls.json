@@ -1,0 +1,18 @@
+{
+  "es": {
+    "message": {
+      "help": "prueba a usar **!player**, **!item**, **!quest**, **!npc** :kissing_heart:",
+      "emptyQuery": "¿qué quieres buscar? Prueba con **!{}** *algo* :kissing_heart:",
+      "noResults": "no he encontrado {}s que coincidan con **{}** :pensive:",
+      "multipleResults": "he encontrado varios {}s que coinciden con **{}**:\n{}"
+    }
+  },
+  "en": {
+    "message": {
+      "help": "try searching something using **!player**, **!item**, **!quest**, **!npc** :kissing_heart:",
+      "emptyQuery": "what do you want to search? Try using **!{}** *something* :kissing_heart:",
+      "noResults": "I haven't found {}s matching **{}** :pensive:",
+      "multipleResults": "I have found multiple {}s matching **{}**:\n{}"
+    }
+  }
+}
