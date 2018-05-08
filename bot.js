@@ -19,10 +19,16 @@ client.on("guildMemberAvailable", (member) => {
 });
 const availableCommands = ["item","i","quest","q","npc","n","player","p","help","h"];
 const reCommand = new RegExp(config.prefix + "(" + availableCommands.join("|") + ")\\s*(.*)");
+/*
+mas rapido pero db menos precisa
 const searchBackend = "https://classicdb.ch/opensearch.php?search={}";	// query
 const resultBackend = "https://classicdb.ch/?{}={}";										// category, id
 const ajaxBackend = "https://classicdb.ch/ajax.php?{}={}&power";				// category, id
 const imageBackend = "http://classicdb.ch/images/icons/{}/{}.jpg";			// size, id(name)
+*/
+const searchBackend = "https://vanilla-twinhead.twinstar.cz/?live-search={}";	// query
+const resultBackend = "https://vanilla-twinhead.twinstar.cz/?{}={}";										// category, id
+const imageBackend = "https://vanilla-twinhead.twinstar.cz/images/icons/wotlk/{}/{}.jpg";			// size, id(name)
 const armoryLink = "http://armory.twinstar.cz/character-sheet.xml?r={}&cn={}";
 const armoryFaceImage = "http://armory.twinstar.cz/images/portraits/wow/{}-{}-{}.gif"; // sex, race, classid
 const discordLink = "{}";
@@ -125,8 +131,8 @@ client.on("message", (message) => {
 									// 1: id
 									// 2: icon
 									// 3: rarity
-								if (data && data[1] && data[1].length > 0 && data[7] && data[7].length) {
-									let d = data[1].map((x, i) => [x].concat(data[7][i]));
+								if (data && data[1] && data[1].length > 0 && data[2] && data[2].length) {
+									let d = data[1].map((x, i) => [x].concat(data[2][i]));
 									let matches = d.filter(x => x[1] == category);
 									switch(matches.length) {
 										case 0:
@@ -135,10 +141,11 @@ client.on("message", (message) => {
 											// TODO: avisar de que hay resultados de otro tipo?
 										break;
 										case 1:
+                      let iconurl = format(imageBackend, "medium", categoryToIcon[matches[0][1]] || matches[0][3].toLowerCase());
 											message.reply({
 												"embed": {
 													"thumbnail": {
-														"url": format(imageBackend, "medium", categoryToIcon[matches[0][1]] || matches[0][3].toLowerCase())
+														"url": iconurl
 													},
 													"url": resultToLink(matches[0]),
 													"title": matches[0][0],
