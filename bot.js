@@ -6,7 +6,8 @@ const nls = require("./nls.json")["es"];
 
 const Discord = require("discord.js");
 const client = new Discord.Client();
-
+const sqlite3 = require('sqlite3').verbose();
+const dbPath = 'db/classic.db';
 client.on("ready", () => {
   // This event will run if the bot starts, and logs in, successfully.
   console.log(`Bot has started, with ${client.users.size} users, in ${client.channels.size} channels of ${client.guilds.size} guilds.`);
@@ -75,7 +76,8 @@ const rarityToColor = {
 	2: 65280,
 	3: 10751,
 	4: 12452095,
-	5: 16748032
+	5: 16748032,
+  6: 16748032
 };
 const elseColor = 15269632;
 // inv_misc_questionmark
@@ -124,49 +126,85 @@ client.on("message", (message) => {
 							});
 						break;
 						default: // classicdb search
-							xhr(encodeURI(format(searchBackend, input)), { json: true }, function(err, data) {
-								// 0: input
-								// 1: names
-								// 7: ids =>
-									// 0: category
-									// 1: id
-									// 2: icon
-									// 3: rarity
-								if (data && data[1] && data[1].length > 0 && data[2] && data[2].length) {
-									let d = data[1].map((x, i) => [x].concat(data[2][i]));
-									let matches = d.filter(x => x[1] == category);
-									switch(matches.length) {
-										case 0:
-											message.reply(format(nls.message.noResults, categoryToCommand[category], input));
-											message.delete();
-											// TODO: avisar de que hay resultados de otro tipo?
-										break;
-										case 1:
-                      let iconurl = format(imageBackend, "medium", categoryToIcon[matches[0][1]] || matches[0][3].toLowerCase());
-											message.reply({
-												"embed": {
-													"thumbnail": {
-														"url": iconurl
-													},
-													"url": resultToLink(matches[0]),
-													"title": matches[0][0],
-													"description": resultToLink(matches[0]),
-													"color": rarityToColor[matches[0][4]] || elseColor
-												}
-											});
-											message.delete();
-										break;
-										default:
-											matches = matches.map(linkWithName);
-											message.reply(format(nls.message.multipleResults, categoryToCommand[category], input, matches.join("\n")));
-											message.delete();
-										break;
-									}
-								} else {
-									message.reply(format(nls.message.noResults, categoryToCommand[category], input));
-									message.delete();
-								}
-							});
+              if (cmd === "i") { // DB solo items por ahora
+                let db = new sqlite3.Database(dbPath);
+                db.all(`SELECT * FROM item_template WHERE lower(name) LIKE ?`, format("%{}%", input.toLowerCase()), (err, items) => {
+                  if (err) {
+                    console.error(err.message);
+                  }
+                  switch(items.length) {
+                    case 0:
+                      message.reply(format(nls.message.noResults, categoryToCommand[category], input));
+                      message.delete();
+                    break;
+                    case 1:
+                      let item = items[0];
+                      let link = format(discordLink, format(resultBackend, "item", item.entry));
+                      message.reply({
+                        "embed": {
+                          "url": link,
+                          "title": item.name,
+                          "description": link,
+                          "color": rarityToColor[item.Quality] || elseColor
+                        }
+                      });
+                      message.delete();
+                    break;
+                    default:
+                      items = items.map(function(item) {
+                        return format("**{}** {}", item.name, format(discordLink, format(resultBackend, "item", item.entry)));
+                      });
+                      message.reply(format(nls.message.multipleResults, categoryToCommand[category], input, items.join("\n")));
+                      message.delete();
+                    break;
+                  }
+                });
+                db.close();
+              } else {
+                xhr(encodeURI(format(searchBackend, input)), { json: true }, function(err, data) {
+                  // 0: input
+                  // 1: names
+                  // 7: ids =>
+                    // 0: category
+                    // 1: id
+                    // 2: icon
+                    // 3: rarity
+                  if (data && data[1] && data[1].length > 0 && data[2] && data[2].length) {
+                    let d = data[1].map((x, i) => [x].concat(data[2][i]));
+                    let matches = d.filter(x => x[1] == category);
+                    switch(matches.length) {
+                      case 0:
+                        message.reply(format(nls.message.noResults, categoryToCommand[category], input));
+                        message.delete();
+                        // TODO: avisar de que hay resultados de otro tipo?
+                      break;
+                      case 1:
+                        let iconurl = format(imageBackend, "medium", categoryToIcon[matches[0][1]] || matches[0][3].toLowerCase());
+                        message.reply({
+                          "embed": {
+                            "thumbnail": {
+                              "url": iconurl
+                            },
+                            "url": resultToLink(matches[0]),
+                            "title": matches[0][0],
+                            "description": resultToLink(matches[0]),
+                            "color": rarityToColor[matches[0][4]] || elseColor
+                          }
+                        });
+                        message.delete();
+                      break;
+                      default:
+                        matches = matches.map(linkWithName);
+                        message.reply(format(nls.message.multipleResults, categoryToCommand[category], input, matches.join("\n")));
+                        message.delete();
+                      break;
+                    }
+                  } else {
+                    message.reply(format(nls.message.noResults, categoryToCommand[category], input));
+                    message.delete();
+                  }
+                });
+              }
 						break;
 					}
 				} else {
