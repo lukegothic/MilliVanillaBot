@@ -29,6 +29,7 @@ const imageBackend = "http://classicdb.ch/images/icons/{}/{}.jpg";			// size, id
 const searchBackend = "https://vanilla-twinhead.twinstar.cz/?live-search={}";	// query
 const resultBackend = "https://vanilla-twinhead.twinstar.cz/?{}={}";										// category, id
 const imageBackend = "https://vanilla-twinhead.twinstar.cz/images/icons/wotlk/{}/{}.jpg";			// size, id(name)
+const ajaxBackend = "https://vanilla-twinhead.twinstar.cz/?tooltip&type={}&id={}";
 const armoryLink = "http://armory.twinstar.cz/character-sheet.xml?r={}&cn={}";
 const armoryFaceImage = "http://armory.twinstar.cz/images/portraits/wow/{}-{}-{}.gif"; // sex, race, classid
 const discordLink = "{}";
